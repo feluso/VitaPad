@@ -9,6 +9,7 @@
 #include <psp2/net/netctl.h>
 #include <psp2/sysmodule.h>
 #include <psp2/touch.h>
+#include <psp2/motion.h>
 #include <psp2/kernel/threadmgr.h>
 
 #define GAMEPAD_PORT  5000
@@ -26,6 +27,12 @@ typedef struct {
 	uint8_t ry;
 	uint16_t tx;
 	uint16_t ty;
+	float gx;
+	float gy;
+	float gz;
+	float ax;
+	float ay;
+	float az;
 	uint8_t click;
 } PadPacket;
 
@@ -34,6 +41,7 @@ typedef struct {
 	SceCtrlData pad;
 	SceTouchData front;
 	SceTouchData retro;
+	SceMotionState motion_state;
 } ExtPadPacket;
 
 // Values for click value
@@ -46,37 +54,55 @@ static uint8_t mode = PAD_PACKET_MODE;
 
 // Server thread
 volatile int connected = 0;
+
+
 static int server_thread(unsigned int args, void* argp){
 	
-	// Initializing a PadPacket
+	// Initializing a PadPacke 
 	PadPacket pkg;
-	ExtPadPacket ext_pkg;
-	
+    ExtPadPacket ext_pkg;
+
 	// Initializing a socket
-	int fd = sceNetSocket("VitaPad", SCE_NET_AF_INET, SCE_NET_SOCK_STREAM, 0);
+	int fd = sceNetSocket("VitaPad", SCE_NET_AF_INET, SCE_NET_SOCK_DGRAM, 0);
 	SceNetSockaddrIn serveraddr;
 	serveraddr.sin_family = SCE_NET_AF_INET;
 	serveraddr.sin_addr.s_addr = sceNetHtonl(SCE_NET_INADDR_ANY);
 	serveraddr.sin_port = sceNetHtons(GAMEPAD_PORT);
 	sceNetBind(fd, (SceNetSockaddr *)&serveraddr, sizeof(serveraddr));
+
+
 	sceNetListen(fd, 128);
-	
+	sceMotionGetAngleThreshold();
+	sceMotionSetDeadband(0);
+	sceMotionSetTiltCorrection(0);
+
 	for (;;){
 		SceNetSockaddrIn clientaddr;
 		unsigned int addrlen = sizeof(clientaddr);
-		int client = sceNetAccept(fd, (SceNetSockaddr *)&clientaddr, &addrlen);
-		if (client >= 0) {
+		clientaddr.sin_addr.s_addr = inet_addr("192.168.0.38");
+		clientaddr.sin_family = SCE_NET_AF_INET;
+		clientaddr.sin_port = sceNetHtons(5000);
+
+		// int client = sceNetAccept(fd, (SceNetSockaddr *)&clientaddr, &addrlen);
+		int err = sceNetConnect(fd, (SceNetSockaddr *)&clientaddr, sizeof(SceNetSockaddr));
+		// if (client >= 0) {
 			connected = 1;
-			char unused[8];
+			// char unused[8];
 			for (;;){
-				sceNetRecv(client,unused,256,0);
+				// sceNetRecv(client,unused,256,0);
 				sceCtrlPeekBufferPositive(0, &ext_pkg.pad, 1);
 				sceTouchPeek(SCE_TOUCH_PORT_FRONT, &ext_pkg.front, 1);
 				sceTouchPeek(SCE_TOUCH_PORT_BACK, &ext_pkg.retro, 1);
+				sceMotionGetState(&ext_pkg.motion_state);
 				switch (mode) {
 				case PAD_PACKET_MODE:
 					memcpy(&pkg, &ext_pkg.pad.buttons, 8); // Buttons + analogs state
 					memcpy(&pkg.tx, &ext_pkg.front.report[0].x, 4); // Touch state
+					memcpy(&pkg.gx, &ext_pkg.motion_state.angularVelocity.x, 4); // Gyro state
+					memcpy(&pkg.gy, &ext_pkg.motion_state.angularVelocity.y, 4); // Gyro state
+					memcpy(&pkg.gz, &ext_pkg.motion_state.angularVelocity.z, 4); // Gyro state
+					memcpy(&pkg.ax, &ext_pkg.motion_state.acceleration.x, 12); // Accel state
+					// printf("Ang.Velocity <x:%+1.3f y:%+1.3f z:%+1.3f>     \n",state.angularVelocity.x, state.angularVelocity.y, state.angularVelocity.z);
 					uint8_t flags = NO_INPUT;
 					if (ext_pkg.front.reportNum > 0) flags += MOUSE_MOV;
 					if (ext_pkg.retro.reportNum > 0){
@@ -84,16 +110,17 @@ static int server_thread(unsigned int args, void* argp){
 						else flags += LEFT_CLICK;
 					}
 					pkg.click = flags;
-					sceNetSend(client, &pkg, sizeof(PadPacket), 0); // Sending PadPacket
+					// sceNetSendto(fd, &pkg, sizeof(PadPacket), SCE_NET_MSG_DONTWAIT, (SceNetSockaddr *)&clientaddr, sizeof(SceNetSockaddr)); // Sending PadPacket
+					sceNetSend(fd, &pkg, sizeof(PadPacket), SCE_NET_MSG_DONTWAIT);
 					break;
 				case EXT_PAD_PACKET_MODE:
-					sceNetSend(client, &ext_pkg, sizeof(ExtPadPacket), 0); // Sending ExtPadPacket
+					sceNetSendto(fd, &ext_pkg, sizeof(ExtPadPacket), SCE_NET_MSG_DONTWAIT, (SceNetSockaddr *)&clientaddr, sizeof(SceNetSockaddr)); // Sending ExtPadPacket
 					break;
 				default:
 					break;
 				}
 			}
-		}
+		// }
 	}
 	
 	return 0;
@@ -104,10 +131,11 @@ uint32_t text_color;
 
 int main(){
 	
-	// Enabling analog and touch support
+	// Enabling analog, touch and motion support
 	sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG_WIDE);
 	sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT, 1);
 	sceTouchSetSamplingState(SCE_TOUCH_PORT_BACK, 1);
+	sceMotionStartSampling();
 	
 	// Initializing graphics stuffs
 	vita2d_init();
@@ -152,7 +180,8 @@ int main(){
 		vita2d_pgf_draw_textf(debug_font, 2, 380, text_color, 1.0, "Thanks to my distinguished Patroners for their awesome support:");
 		vita2d_pgf_draw_textf(debug_font, 2, 400, text_color, 1.0, "@Sarkies_Proxy - ArkSource - Freddy Parra");
 		vita2d_pgf_draw_textf(debug_font, 2, 420, text_color, 1.0, "RaveHeart - Tain Sueiras - drd7of14 - psymu");
-		vita2d_pgf_draw_textf(debug_font, 2, 440, text_color, 1.0, "The Vita3K project - nullobject - polytoad");
+		// vita2d_pgf_draw_textf(debug_font, 2, 440, text_color, 1.0, "Ang.Velocity <x:%+1.3f y:%+1.3f z:%+1.3f>     \n",pkg.gx, pkg.gy,pkg.gz);
+		// vita2d_pgf_draw_textf(debug_font, 2, 460, text_color, 1.0, "Bytes sent %d         \n",bytes_sent);
 		vita2d_end_drawing();
 		vita2d_wait_rendering_done();
 		vita2d_swap_buffers();
