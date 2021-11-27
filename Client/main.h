@@ -36,5 +36,11 @@ typedef struct{
 	uint8_t ry;
 	uint16_t tx;
 	uint16_t ty;
+	float gx;
+	float gy;
+	float gz;
+	float ax;
+	float ay;
+	float az;
 	uint8_t click;
 } PadPacket, *pPadPacket;
