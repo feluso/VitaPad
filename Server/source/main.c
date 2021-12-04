@@ -72,14 +72,14 @@ static int server_thread(unsigned int args, void* argp){
 
 
 	sceNetListen(fd, 128);
-	sceMotionGetAngleThreshold();
 	sceMotionSetDeadband(0);
 	sceMotionSetTiltCorrection(0);
+	sceMotionSetGyroBiasCorrection(0);
 
 	for (;;){
 		SceNetSockaddrIn clientaddr;
 		unsigned int addrlen = sizeof(clientaddr);
-		clientaddr.sin_addr.s_addr = inet_addr("192.168.0.38");
+		clientaddr.sin_addr.s_addr = inet_addr("192.168.0.3");
 		clientaddr.sin_family = SCE_NET_AF_INET;
 		clientaddr.sin_port = sceNetHtons(5000);
 
@@ -98,9 +98,7 @@ static int server_thread(unsigned int args, void* argp){
 				case PAD_PACKET_MODE:
 					memcpy(&pkg, &ext_pkg.pad.buttons, 8); // Buttons + analogs state
 					memcpy(&pkg.tx, &ext_pkg.front.report[0].x, 4); // Touch state
-					memcpy(&pkg.gx, &ext_pkg.motion_state.angularVelocity.x, 4); // Gyro state
-					memcpy(&pkg.gy, &ext_pkg.motion_state.angularVelocity.y, 4); // Gyro state
-					memcpy(&pkg.gz, &ext_pkg.motion_state.angularVelocity.z, 4); // Gyro state
+					memcpy(&pkg.gx, &ext_pkg.motion_state.angularVelocity.x, 12); // Gyro state
 					memcpy(&pkg.ax, &ext_pkg.motion_state.acceleration.x, 12); // Accel state
 					// printf("Ang.Velocity <x:%+1.3f y:%+1.3f z:%+1.3f>     \n",state.angularVelocity.x, state.angularVelocity.y, state.angularVelocity.z);
 					uint8_t flags = NO_INPUT;
