@@ -1,6 +1,9 @@
 #include <Windows.h>
 
 #include "ViGEm.h"
+#include <iostream>
+using namespace std;
+
 
 PVIGEM_CLIENT client;
 PVIGEM_TARGET target;
@@ -32,78 +35,96 @@ bool vgInit()
 
 bool vgSubmit(pPadPacket packet)
 {
-    DS4_REPORT report;
-    DS4_REPORT_INIT(&report);
+    DS4_REPORT_EX report;
+    RtlZeroMemory(&report, sizeof(DS4_REPORT_EX));
 
-    report.bThumbLX = packet->lx;
-    report.bThumbLY = packet->ly;
-    report.bThumbRX = packet->rx;
-    report.bThumbRY = packet->ry;
+    report.Report.bThumbLX = 0x80;
+    report.Report.bThumbLY = 0x80;
+    report.Report.bThumbRX = 0x80;
+    report.Report.bThumbRY = 0x80;
+
+    // DS4_SET_DPAD(report.Report, DS4_BUTTON_DPAD_NONE);
+
+    report.Report.bThumbLX = packet->lx;
+    report.Report.bThumbLY = packet->ly;
+    report.Report.bThumbRX = packet->rx;
+    report.Report.bThumbRY = packet->ry;
+
+    report.Report.wGyroX = (short) (packet->gx * 2607.6);
+    report.Report.wGyroY = (short) (packet->gz * 2607.6);
+    report.Report.wGyroZ = (short) (packet->gy * -2607.6);
+
+    report.Report.wAccelX = (short) (packet->ay * 0x2000);
+    report.Report.wAccelY = (short) (packet->az * -0x2000);
+    report.Report.wAccelZ = (short) (packet->ax * -0x2000);
 
     if (packet->buttons & SCE_CTRL_SELECT)
     {
-        report.wButtons = report.wButtons | DS4_BUTTON_OPTIONS;
+        report.Report.wButtons = report.Report.wButtons | DS4_BUTTON_OPTIONS;
     }
     if (packet->buttons & SCE_CTRL_START)
     {
-        report.wButtons = report.wButtons | DS4_BUTTON_SHARE;
+        report.Report.wButtons = report.Report.wButtons | DS4_BUTTON_SHARE;
     }
     if (packet->buttons & SCE_CTRL_LTRIGGER)
     {
-        report.wButtons = report.wButtons | DS4_BUTTON_TRIGGER_LEFT;
-        report.bTriggerL = 0xFF;
+        report.Report.wButtons = report.Report.wButtons | DS4_BUTTON_TRIGGER_LEFT;
+        report.Report.bTriggerL = 0xFF;
     }
     if (packet->buttons & SCE_CTRL_RTRIGGER)
     {
-        report.wButtons = report.wButtons | DS4_BUTTON_TRIGGER_RIGHT;
-        report.bTriggerR = 0xFF;
+        report.Report.wButtons = report.Report.wButtons | DS4_BUTTON_TRIGGER_RIGHT;
+        report.Report.bTriggerR = 0xFF;
     }
     if (packet->buttons & SCE_CTRL_TRIANGLE)
     {
-        report.wButtons = report.wButtons | DS4_BUTTON_TRIANGLE;
+        report.Report.wButtons = report.Report.wButtons | DS4_BUTTON_TRIANGLE;
     }
     if (packet->buttons & SCE_CTRL_CIRCLE)
     {
-        report.wButtons = report.wButtons | DS4_BUTTON_CIRCLE;
+        report.Report.wButtons = report.Report.wButtons | DS4_BUTTON_CIRCLE;
     }
     if (packet->buttons & SCE_CTRL_CROSS)
     {
-        report.wButtons = report.wButtons | DS4_BUTTON_CROSS;
+        report.Report.wButtons = report.Report.wButtons | DS4_BUTTON_CROSS;
     }
     if (packet->buttons & SCE_CTRL_SQUARE)
     {
-        report.wButtons = report.wButtons | DS4_BUTTON_SQUARE;
+        report.Report.wButtons = report.Report.wButtons | DS4_BUTTON_SQUARE;
     }
     if (packet->click & MOUSE_MOV && packet->tx < SCREEN_WIDTH / 2 && packet->ty < SCREEN_HEIGHT / 2)
     {
-        report.wButtons = report.wButtons | DS4_BUTTON_SHOULDER_LEFT;
+        report.Report.wButtons = report.Report.wButtons | DS4_BUTTON_SHOULDER_LEFT;
     }
     if (packet->click & MOUSE_MOV && packet->tx >= SCREEN_WIDTH / 2 && packet->ty < SCREEN_HEIGHT / 2)
     {
-        report.wButtons = report.wButtons | DS4_BUTTON_SHOULDER_RIGHT;
+        report.Report.wButtons = report.Report.wButtons | DS4_BUTTON_SHOULDER_RIGHT;
     }
     if (packet->click & MOUSE_MOV && packet->tx < SCREEN_WIDTH / 2 && packet->ty >= SCREEN_HEIGHT / 2)
     {
-        report.wButtons = report.wButtons | DS4_BUTTON_THUMB_LEFT;
+        report.Report.wButtons = report.Report.wButtons | DS4_BUTTON_THUMB_LEFT;
     }
     if (packet->click & MOUSE_MOV && packet->tx >= SCREEN_WIDTH / 2 && packet->ty >= SCREEN_HEIGHT / 2)
     {
-        report.wButtons = report.wButtons | DS4_BUTTON_THUMB_RIGHT;
+        report.Report.wButtons = report.Report.wButtons | DS4_BUTTON_THUMB_RIGHT;
     }
 
-    if (packet->buttons & SCE_CTRL_UP) DS4_SET_DPAD(&report, DS4_BUTTON_DPAD_NORTH);
-    if (packet->buttons & SCE_CTRL_RIGHT) DS4_SET_DPAD(&report, DS4_BUTTON_DPAD_EAST);
-    if (packet->buttons & SCE_CTRL_DOWN) DS4_SET_DPAD(&report, DS4_BUTTON_DPAD_SOUTH);
-    if (packet->buttons & SCE_CTRL_LEFT) DS4_SET_DPAD(&report, DS4_BUTTON_DPAD_WEST);
+    // if (packet->buttons & SCE_CTRL_UP) DS4_SET_DPAD(&report, DS4_BUTTON_DPAD_NORTH);
+    // if (packet->buttons & SCE_CTRL_RIGHT) DS4_SET    _DPAD(&report, DS4_BUTTON_DPAD_EAST);
+    // if (packet->buttons & SCE_CTRL_DOWN) DS4_SET_DPAD(&report, DS4_BUTTON_DPAD_SOUTH);
+    // if (packet->buttons & SCE_CTRL_LEFT) DS4_SET_DPAD(&report, DS4_BUTTON_DPAD_WEST);
 
-    if (packet->buttons & SCE_CTRL_UP
-        && packet->buttons & SCE_CTRL_RIGHT) DS4_SET_DPAD(&report, DS4_BUTTON_DPAD_NORTHEAST);
-    if (packet->buttons & SCE_CTRL_RIGHT
-        && packet->buttons & SCE_CTRL_DOWN) DS4_SET_DPAD(&report, DS4_BUTTON_DPAD_SOUTHEAST);
-    if (packet->buttons & SCE_CTRL_DOWN
-        && packet->buttons & SCE_CTRL_LEFT) DS4_SET_DPAD(&report, DS4_BUTTON_DPAD_SOUTHWEST);
-    if (packet->buttons & SCE_CTRL_LEFT
-        && packet->buttons & SCE_CTRL_UP) DS4_SET_DPAD(&report, DS4_BUTTON_DPAD_NORTHWEST);
+    // if (packet->buttons & SCE_CTRL_UP
+    //     && packet->buttons & SCE_CTRL_RIGHT) DS4_SET_DPAD(&report, DS4_BUTTON_DPAD_NORTHEAST);
+    // if (packet->buttons & SCE_CTRL_RIGHT
+    //     && packet->buttons & SCE_CTRL_DOWN) DS4_SET_DPAD(&report, DS4_BUTTON_DPAD_SOUTHEAST);
+    // if (packet->buttons & SCE_CTRL_DOWN
+    //     && packet->buttons & SCE_CTRL_LEFT) DS4_SET_DPAD(&report, DS4_BUTTON_DPAD_SOUTHWEST);
+    // if (packet->buttons & SCE_CTRL_LEFT
+    //     && packet->buttons & SCE_CTRL_UP) DS4_SET_DPAD(&report, DS4_BUTTON_DPAD_NORTHWEST);
+    // memcpy(&report.ReportBuffer, &report.Report, 63);
+        
+    bool success = VIGEM_SUCCESS(vigem_target_ds4_update_ex(client, target, report));
     
-    return VIGEM_SUCCESS(vigem_target_ds4_update(client, target, report));
+    return success;
 }

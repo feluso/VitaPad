@@ -529,19 +529,27 @@ int main(int argc,char** argv){
 	my_socket->addrTo.sin_family = AF_INET;
 	my_socket->addrTo.sin_port = htons(5000);
 	my_socket->addrTo.sin_addr.s_addr = inet_addr(host);
-	my_socket->sock = socket(AF_INET, SOCK_STREAM, 0);
+	my_socket->sock = socket(AF_INET, SOCK_DGRAM, 0);
 	if (my_socket->sock < 0){
 		printf("\nFailed creating socket.");
 		return -1;
 	}else printf("\nClient socket created on port 5000");
 
 	// Connecting to VitaPad
-	int err = connect(my_socket->sock, (struct sockaddr*)&my_socket->addrTo, sizeof(my_socket->addrTo));
-	if (err < 0 ){
-		printf("\nFailed connecting server.");
-		close(my_socket->sock);
-		return -1;
-	}else printf("\nConnection established!");
+	// int err = connect(my_socket->sock, (struct sockaddr*)&my_socket->addrTo, sizeof(my_socket->addrTo));
+
+	sockaddr_in clientAddr;
+	clientAddr.sin_family = AF_INET;
+	clientAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+	clientAddr.sin_port = htons(5000);
+
+	bind(my_socket->sock, (struct sockaddr*)&clientAddr, sizeof(clientAddr));
+
+	// if (err < 0 ){
+	// 	printf("\nFailed connecting server.");
+	// 	close(my_socket->sock);
+	// 	return -1;
+	// }else printf("\nConnection established!");
 	fflush(stdout);
 	
 	// Preparing input packets
@@ -568,8 +576,9 @@ int main(int argc,char** argv){
 			printf("\nConfig file reloaded since a modification has been detected.");
 		}		
 		
-		send(my_socket->sock, "request", 8, 0);
-		int count = recv(my_socket->sock, (char*)&data, 256, 0);
+		// send(my_socket->sock, "request", 8, 0);
+		recv(my_socket->sock, (char*)&data, 255, 0);
+		int count = 1;
 		if (firstScan){
 			firstScan = 0;
 			memcpy(&olddata,&data,sizeof(PadPacket));
@@ -693,6 +702,7 @@ int main(int argc,char** argv){
 			else
 			#endif
 			{
+				printf("Nope \n");
 				// Down
 				if ((data.buttons & SCE_CTRL_DOWN) && (!(olddata.buttons & SCE_CTRL_DOWN))) SEND_BUTTON_PRESS(KEY_DOWN);
 				else if ((olddata.buttons & SCE_CTRL_DOWN) && (!(data.buttons & SCE_CTRL_DOWN))) SEND_BUTTON_RELEASE(KEY_DOWN);
