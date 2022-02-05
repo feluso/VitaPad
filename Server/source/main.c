@@ -74,12 +74,11 @@ static int server_thread(unsigned int args, void* argp){
 	sceNetListen(fd, 128);
 	sceMotionSetDeadband(0);
 	sceMotionSetTiltCorrection(0);
-	sceMotionSetGyroBiasCorrection(0);
 
 	for (;;){
 		SceNetSockaddrIn clientaddr;
 		unsigned int addrlen = sizeof(clientaddr);
-		clientaddr.sin_addr.s_addr = inet_addr("192.168.0.3");
+		clientaddr.sin_addr.s_addr = inet_addr("192.168.1.2");
 		clientaddr.sin_family = SCE_NET_AF_INET;
 		clientaddr.sin_port = sceNetHtons(5000);
 
