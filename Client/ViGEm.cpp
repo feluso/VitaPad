@@ -49,10 +49,12 @@ bool vgSubmit(pPadPacket packet)
     report.Report.bThumbLY = packet->ly;
     report.Report.bThumbRX = packet->rx;
     report.Report.bThumbRY = packet->ry;
-
-    report.Report.wGyroX = (short) (packet->gx * 2607.6);
-    report.Report.wGyroY = (short) (packet->gz * 2607.6);
-    report.Report.wGyroZ = (short) (packet->gy * -2607.6);
+    // 2000 degrees * pi rad / 180 degrees
+    float ds4MaxAngVelocity = 34.906585f;
+    float conversionValue = 32767.0f / ds4MaxAngVelocity;
+    report.Report.wGyroX = (short) (packet->gx * ds4MaxAngVelocity);
+    report.Report.wGyroY = (short) (packet->gz * ds4MaxAngVelocity);
+    report.Report.wGyroZ = (short) (packet->gy * -ds4MaxAngVelocity);
 
     report.Report.wAccelX = (short) (packet->ay * 0x2000);
     report.Report.wAccelY = (short) (packet->az * -0x2000);
